@@ -1,0 +1,230 @@
+---
+title: "Ssexual dimorphism in rat single-cell tubular epithelial clusters"
+author: "AGV"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages
+```{r}
+library(Seurat)
+library(ggplot2)
+library(stringr)
+library(openxlsx)
+library(annotables)
+library(dplyr)
+```
+
+## Import data
+```{r}
+print(getwd())
+dataPath <- "..\\01_Integration 2.0\\Results\\Data_res-2.RData"
+print(dataPath)
+```
+```{r}
+load(dataPath)
+Gene_Info <- rnor6
+```
+
+## Plot all clusters
+```{r, fig.width=10, fig.height=10}
+DimPlot(object = all.combined,
+              reduction = "umap",
+              label = T)
+ggsave(filename = paste("./Results/01_ALL clusters", ".tiff", sep = ""),
+       device = "tiff",
+       dpi = 600)
+```
+
+## Rename Idents
+```{r, fig.width=10, fig.height=10}
+Idents(all.combined) <- "seurat_clusters"
+
+all.combined <- RenameIdents(all.combined,
+                             '12' = "Lymphoid",
+                             '40' = "Lymphoid",
+                            '39' = "Myeloid",
+                            '21' = "Myeloid",
+                            '31' = "Myeloid",
+                            '23' = "Myeloid",
+                            '8' = "Myeloid",
+                            '1' = "Myeloid",
+                            '37' = "Myeloid",
+                            '27' = "Myeloid",
+                            '32' = "Endothelial",
+                            '24' = "Endothelial",
+                            '26' = "Endothelial",
+                            '33' = "aFIB",
+                            '36' = "vSMC_REN_FIB",
+                            '2' = "TAL",
+                            '3' = "TAL",
+                            '16' = "TAL",
+                            '13' = "TAL",
+                            '10' = "TAL",
+                            '6' = "TAL",
+                            '5' = "PT",
+                            '14' = "PT",
+                            '7' = "PT",
+                            '22' = "PT",
+                            '0' = "PT",
+                            '4' = "PT",
+                            '11' = "PT",
+                            '30' = "NA",
+                            '17' = "PC",
+                            '18' = "DCT",
+                            '15' = "IC-A",
+                            '20' = "IC-A",
+                            '25' = "IC-B",
+                            '9' = "IC-B",
+                            '38' = "tIC_PC",
+                            '35' = "PEC",
+                            '34' = "PEC",
+                            '19' = "Thin Limbs",
+                            '29' = "Thin Limbs",
+                            '28' = "Thin Limbs"
+)
+                            
+Idents(all.combined) <- factor(Idents(all.combined), levels = c("aFIB",
+                                                              "vSMC_REN_FIB",
+                                                              "Endothelial",
+                                                              "PT",
+                                                              "PEC",
+                                                              "Thin Limbs",
+                                                              "TAL",
+                                                              "DCT",
+                                                              "PC",
+                                                              "tIC_PC",
+                                                              "IC-A",
+                                                              "IC-B",
+                                                              "Myeloid",
+                                                              "Lymphoid"
+                                                              ))
+                                                              
+DimPlot(object = all.combined,
+        label = T,
+        label.size = 5,
+        pt.size = 0.75,
+        repel = T,
+        raster = F)
+ggsave(filename = paste("./Results/02_New Idents_UMAP", ".tiff", sep = ""),
+       bg = "white",
+       device = "tiff",
+       dpi = 600)
+
+```
+
+## Subset Tubular Epithelial Cells
+```{r, fig.width=10, fig.height=10}
+TubEpiC <- subset(all.combined,
+                  idents = c("PT",
+                             "Thin Limbs",
+                             "TAL",
+                             "DCT",
+                             "PC",
+                             "IC-A",
+                             "IC-B"))
+
+DimPlot(object = TubEpiC,
+              reduction = "umap",
+              label = T)
+ggsave(filename = paste("./Results/03_Tubular Epithelial Cells", ".tiff", sep = ""),
+       device = "tiff",
+       dpi = 600)
+```
+```{r}
+table(TubEpiC$sample, TubEpiC@active.ident)
+
+DimPlot(object = TubEpiC,
+        reduction = "umap",
+        split.by = "sample")
+
+ggsave(filename = paste("./Results/04_Tubular Epithelial Cells_Sex", ".tiff", sep = ""),
+       device = "tiff",
+       dpi = 600,
+       width = 50, height = 20, units = "cm")
+```
+
+### Format Metadata
+```{r}
+table(TubEpiC$sample)
+
+TubEpiC$Sex <- case_when(
+  TubEpiC$sample %in% c("OCR_F", "Old_F", "Young_F") ~ "F",
+  TubEpiC$sample %in% c("OCR_M", "Old_M", "Young_M") ~ "M",
+  TRUE ~ "Sex"
+)
+
+table(TubEpiC$Sex)
+```
+
+```{r, fig.width=10, fig.height=10}
+DimPlot(object = TubEpiC,
+        reduction = "umap",
+        label = T,
+        split.by = "Sex")
+ggsave(filename = paste("./Results/05_Tubular Epithelial Cells_Sex", ".tiff", sep = ""),
+       device = "tiff",
+       dpi = 600)
+
+```
+
+```{r}
+TubEpiC$SexCluster <- paste(TubEpiC@active.ident, TubEpiC$Sex, sep="_")
+table(TubEpiC$SexCluster)
+TubEpiC@active.ident <- as.factor(TubEpiC$SexCluster)
+```
+
+### Find Sex DEG on each cluster
+```{r}
+findMarkersAndWriteExcel <- function(ident1, ident2, name, workbook) {
+  Sex_DEG <- FindMarkers(TubEpiC,
+                         ident.1 = ident1,
+                         ident.2 = ident2,
+                         min.pct = 0.20,
+                         logfc.threshold = 1.2)
+  Sex_DEG$symbol <- rownames(Sex_DEG)
+  Sex_DEG <- merge(Sex_DEG,
+                   by.x = 'symbol',
+                   all.x = TRUE,
+                   Gene_Info[,c("symbol", "chr", "description")],
+                   by.y = 'symbol',
+                   all.y = FALSE)
+  Sex_DEG <- Sex_DEG %>%
+    filter(p_val_adj <= 0.05) %>%
+    arrange(avg_log2FC) %>%
+    distinct(symbol, .keep_all = T)
+  
+  colnames(Sex_DEG)[colnames(Sex_DEG) == "pct.1"] <- ident1
+  colnames(Sex_DEG)[colnames(Sex_DEG) == "pct.2"] <- ident2
+  
+  if (!file.exists(workbook)) {
+    wb <- createWorkbook()
+    addWorksheet(wb, name)
+  } else {
+    wb <- loadWorkbook(workbook)
+    addWorksheet(wb, name)
+  }
+  
+  writeData(wb, name, Sex_DEG)
+  saveWorkbook(wb, workbook, overwrite = TRUE)
+}
+
+workbook <- "./Results/DEG_by_Sex.xlsx"
+
+findMarkersAndWriteExcel("PT_M", "PT_F", "PT", workbook)
+findMarkersAndWriteExcel("Thin Limbs_M", "Thin Limbs_F", "Thin Limbs", workbook)
+findMarkersAndWriteExcel("TAL_M", "TAL_F", "TAL", workbook)
+findMarkersAndWriteExcel("DCT_M", "DCT_F", "DCT", workbook)
+findMarkersAndWriteExcel("PC_M", "PC_F", "PC", workbook)
+findMarkersAndWriteExcel("IC-A_M", "IC-A_F", "IC-A", workbook)
+findMarkersAndWriteExcel("IC-B_M", "IC-B_F", "IC-B", workbook)
+```
+
+#### Session Info
+```{r}
+sessionInfo()
+```
