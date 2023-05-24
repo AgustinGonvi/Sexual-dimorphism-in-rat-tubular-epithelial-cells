@@ -224,6 +224,12 @@ findMarkersAndWriteExcel("IC-A_M", "IC-A_F", "IC-A", workbook)
 findMarkersAndWriteExcel("IC-B_M", "IC-B_F", "IC-B", workbook)
 ```
 
+### Clean Environment
+```{r}
+rm(all.anchors)
+rm(all.combined)
+gc(verbose = T)
+```
 #### Session Info
 ```{r}
 sessionInfo()
