@@ -1,5 +1,5 @@
 ---
-title: "Ssexual dimorphism in rat single-cell tubular epithelial clusters"
+title: "Sexual dimorphism in rat single-cell tubular epithelial clusters"
 author: "AGV"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: github_document
